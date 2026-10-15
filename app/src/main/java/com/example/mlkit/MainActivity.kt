@@ -7,31 +7,18 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import com.example.mlkit.ui.theme.MLKitTheme
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import com.example.mlkit.ui.view.CameraPreviewWithObjectDetection
+import com.example.mlkit.ui.view.PermissionRequest
 
 class MainActivity : ComponentActivity() {
 
@@ -68,91 +55,5 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-}
-
-@Composable
-fun PermissionRequest() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text("Camera permission is required")
-    }
-}
-
-@Composable
-fun CameraPreviewWithObjectDetection() {
-    val context = LocalContext.current
-    var detectedObjects by remember { mutableStateOf<List<DetectedObject>>(emptyList()) }
-    var imageWidth by remember { mutableIntStateOf(0) }
-    var imageHeight by remember { mutableIntStateOf(0) }
-
-    val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
-
-    val analyzer = remember {
-        ObjectDetectorAnalyzer { objects, width, height ->
-            detectedObjects = objects
-            imageWidth = width
-            imageHeight = height
-        }
-    }
-
-    DisposableEffect(Unit) {
-        onDispose {
-            analyzer.close()
-            cameraExecutor.shutdown()
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        AndroidView(
-            factory = { ctx ->
-                val previewView = PreviewView(ctx)
-
-                val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-                cameraProviderFuture.addListener({
-                    val cameraProvider = cameraProviderFuture.get()
-
-                    val preview = Preview.Builder()
-                        .build()
-                        .also {
-                            it.surfaceProvider = previewView.surfaceProvider
-                        }
-
-                    val imageAnalyzer = ImageAnalysis.Builder()
-                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                        .build()
-                        .also {
-                            it.setAnalyzer(cameraExecutor, analyzer)
-                        }
-
-                    val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
-                    try {
-                        cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
-                            ctx as ComponentActivity,
-                            cameraSelector,
-                            preview,
-                            imageAnalyzer
-                        )
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                    }
-
-                }, ContextCompat.getMainExecutor(ctx))
-
-                previewView
-            },
-            modifier = Modifier.fillMaxSize()
-        )
-
-        ObjectOverlay(
-            detectedObjects = detectedObjects,
-            imageWidth = imageWidth,
-            imageHeight = imageHeight,
-            modifier = Modifier.fillMaxSize()
-        )
     }
 }
